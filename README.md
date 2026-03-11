@@ -56,3 +56,4 @@ Authorization: Bearer <access_token>
 ## 👨‍💻 Developed By
 Your Name:
 Sakshi Hiremath
+JobPortal Backend API using Django REST Framework
