@@ -1,20 +1,25 @@
 from django.urls import path
 from .views import (
+    JobListView,
     ApplyJobView,
     MyApplicationsView,
     JobApplicationsView,
-    UpdateApplicationStatusView
+    UpdateApplicationStatusView,
 )
 
 urlpatterns = [
+    # List all jobs / Create job
+    path('jobs/', JobListView.as_view(), name='job-list'),
 
-    path("jobs/<int:job_id>/apply/", ApplyJobView.as_view()),
+    # Apply for a job
+    path('jobs/<int:job_id>/apply/', ApplyJobView.as_view(), name='apply-job'),
 
-    path("my-applications/", MyApplicationsView.as_view()),
+    # Candidate → view their applications
+    path('my-applications/', MyApplicationsView.as_view(), name='my-applications'),
 
-    path("jobs/<int:job_id>/applications/", JobApplicationsView.as_view()),
+    # Employer → view applications for a job
+    path('jobs/<int:job_id>/applications/', JobApplicationsView.as_view(), name='job-applications'),
 
-    path("applications/<int:application_id>/status/",
-         UpdateApplicationStatusView.as_view()),
-
+    # Employer → accept/reject application
+    path('applications/<int:application_id>/status/', UpdateApplicationStatusView.as_view(), name='update-application-status'),
 ]

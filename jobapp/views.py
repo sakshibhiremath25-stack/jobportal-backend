@@ -1,81 +1,54 @@
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
+from rest_framework import generics, permissions, serializers
 from rest_framework.response import Response
 from rest_framework import status
-from .models import Job
-from .serializers import JobSerializer
+from .models import JobApplication, Job
+from .serializers import JobApplicationSerializer, JobSerializer
 
 
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def create_job(request):
+# List all jobs or create a new job (GET + POST)
+class JobListView(generics.ListCreateAPIView):
+    queryset = Job.objects.all()
+    serializer_class = JobSerializer
+    permission_classes = [permissions.IsAuthenticated]  # Only authenticated users can create
 
-    if request.user.role != "RECRUITER":
-        return Response(
-            {"error": "Only recruiters can post jobs"},
-            status=status.HTTP_403_FORBIDDEN
-        )
-
-    serializer = JobSerializer(data=request.data)
-
-    if serializer.is_valid():
-        serializer.save(company=request.user)
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
-
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    def perform_create(self, serializer):
+        # Only allow recruiters to create jobs
+        if not self.request.user.is_staff:  # or use a custom field like is_recruiter
+            raise serializers.ValidationError("Only recruiters can create jobs.")
+        serializer.save(employer=self.request.user)
 
 
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def list_jobs(request):
-    jobs = Job.objects.all()
-    serializer = JobSerializer(jobs, many=True)
-    return Response(serializer.data)
+# Candidate: view jobs they applied for
+class MyApplicationsView(generics.ListAPIView):
+    serializer_class = JobApplicationSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return JobApplication.objects.filter(user=self.request.user)
 
 
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def job_detail(request, pk):
-    try:
-        job = Job.objects.get(pk=pk)
-    except Job.DoesNotExist:
-        return Response({"error": "Job not found"}, status=404)
+# Recruiter: view applications for a specific job
+class JobApplicationsView(generics.ListAPIView):
+    serializer_class = JobApplicationSerializer
+    permission_classes = [permissions.IsAuthenticated]
 
-    serializer = JobSerializer(job)
-    return Response(serializer.data)
+    def get_queryset(self):
+        job_id = self.kwargs['job_id']
+        return JobApplication.objects.filter(job_id=job_id)
 
 
-@api_view(['PUT'])
-@permission_classes([IsAuthenticated])
-def update_job(request, pk):
+# Candidate: apply for a job
+class ApplyJobView(generics.CreateAPIView):
+    queryset = JobApplication.objects.all()
+    serializer_class = JobApplicationSerializer
+    permission_classes = [permissions.IsAuthenticated]
 
-    try:
-        job = Job.objects.get(pk=pk)
-    except Job.DoesNotExist:
-        return Response({"error": "Job not found"}, status=404)
+    def perform_create(self, serializer):
+        job = serializer.validated_data['job']
+        user = self.request.user
 
-    if request.user != job.company:
-        return Response({"error": "Not allowed"}, status=403)
+        if JobApplication.objects.filter(user=user, job=job).exists():
+            raise serializers.ValidationError("You have already applied for this job.")
 
-    serializer = JobSerializer(job, data=request.data)
-    if serializer.is_valid():
-        serializer.save()
-        return Response(serializer.data)
-
-    return Response(serializer.errors, status=400)
-
-
-@api_view(['DELETE'])
-@permission_classes([IsAuthenticated])
-def delete_job(request, pk):
-
-    try:
-        job = Job.objects.get(pk=pk)
-    except Job.DoesNotExist:
-        return Response({"error": "Job not found"}, status=404)
-
-    if request.user != job.company:
-        return Response({"error": "Not allowed"}, status=403)
-
-    job.delete()
-    return Response({"message": "Job deleted successfully"}, status=204)
+        serializer.save(user=user)
+        
