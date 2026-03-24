@@ -70,4 +70,6 @@ class UpdateApplicationStatusView(generics.UpdateAPIView):
             raise PermissionDenied("You are not allowed to update this application")
 
         serializer.save()
+        # Updated for pull request
+        
         
