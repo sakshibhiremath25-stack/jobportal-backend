@@ -30,4 +30,5 @@ urlpatterns = [
 
     # Recruiter view applications for a job
     path('jobs/<int:job_id>/applications/', JobApplicationsView.as_view(), name='job-applications'),
+    
 ]

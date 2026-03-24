@@ -1,47 +1,51 @@
 from rest_framework import generics, permissions, serializers
-from rest_framework.response import Response
-from rest_framework import status
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.exceptions import PermissionDenied
+
 from .models import JobApplication, Job
 from .serializers import JobApplicationSerializer, JobSerializer
 
 
-# List all jobs or create a new job (GET + POST)
+# 🔹 List all jobs or create job
 class JobListView(generics.ListCreateAPIView):
     queryset = Job.objects.all()
     serializer_class = JobSerializer
-    permission_classes = [permissions.IsAuthenticated]  # Only authenticated users can create
+    permission_classes = [IsAuthenticated]
 
     def perform_create(self, serializer):
-        # Only allow recruiters to create jobs
-        if not self.request.user.is_staff:  # or use a custom field like is_recruiter
+        if not self.request.user.is_staff:
             raise serializers.ValidationError("Only recruiters can create jobs.")
         serializer.save(employer=self.request.user)
 
 
-# Candidate: view jobs they applied for
-class MyApplicationsView(generics.ListAPIView):
+# 🔹 Candidate: View applied jobs
+class CandidateAppliedJobsView(generics.ListAPIView):
     serializer_class = JobApplicationSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         return JobApplication.objects.filter(user=self.request.user)
 
 
-# Recruiter: view applications for a specific job
-class JobApplicationsView(generics.ListAPIView):
+# 🔹 Employer: View applicants for a job
+class EmployerApplicationsView(generics.ListAPIView):
     serializer_class = JobApplicationSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         job_id = self.kwargs['job_id']
-        return JobApplication.objects.filter(job_id=job_id)
+
+        return JobApplication.objects.filter(
+            job_id=job_id,
+            job__employer=self.request.user   # ✅ restrict to owner
+        )
 
 
-# Candidate: apply for a job
+# 🔹 Candidate: Apply for a job
 class ApplyJobView(generics.CreateAPIView):
     queryset = JobApplication.objects.all()
     serializer_class = JobApplicationSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [IsAuthenticated]
 
     def perform_create(self, serializer):
         job = serializer.validated_data['job']
@@ -51,4 +55,19 @@ class ApplyJobView(generics.CreateAPIView):
             raise serializers.ValidationError("You have already applied for this job.")
 
         serializer.save(user=user)
+
+
+# 🔹 Employer: Update application status
+class UpdateApplicationStatusView(generics.UpdateAPIView):
+    queryset = JobApplication.objects.all()
+    serializer_class = JobApplicationSerializer
+    permission_classes = [IsAuthenticated]
+
+    def perform_update(self, serializer):
+        application = self.get_object()
+
+        if application.job.employer != self.request.user:
+            raise PermissionDenied("You are not allowed to update this application")
+
+        serializer.save()
         
