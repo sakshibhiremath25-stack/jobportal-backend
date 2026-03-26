@@ -1,5 +1,17 @@
 from rest_framework import serializers
 from .models import Job, JobApplication
+from .models import ScreeningQuestion, CandidateAnswer
+
+class ScreeningQuestionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ScreeningQuestion
+        fields = "__all__"
+
+
+class CandidateAnswerSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CandidateAnswer
+        fields = "__all__"
 
 
 # =========================

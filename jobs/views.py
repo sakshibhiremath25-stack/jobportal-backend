@@ -5,6 +5,74 @@ from rest_framework import generics, serializers
 
 from .models import Job, JobApplication
 from .serializers import JobSerializer, JobApplicationSerializer
+from rest_framework import generics
+from .models import ScreeningQuestion, CandidateAnswer
+from .serializers import ScreeningQuestionSerializer, CandidateAnswerSerializer
+from .models import ScreeningQuestion
+from .serializers import ScreeningQuestionSerializer
+from .models import CandidateAnswer, ScreeningQuestion
+from rest_framework import status
+
+class CandidateAnswersView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, job_id):
+        answers = CandidateAnswer.objects.filter(question__job_id=job_id)
+
+        data = []
+        for answer in answers:
+            data.append({
+                "candidate": answer.candidate.username,
+                "question": answer.question.question_text,
+                "answer": answer.answer_text
+            })
+
+        return Response(data)
+
+
+class ApplyJobView(APIView):
+
+    def post(self, request, job_id):
+
+        total_questions = ScreeningQuestion.objects.filter(job_id=job_id).count()
+
+        answered_questions = CandidateAnswer.objects.filter(
+            candidate=request.user,
+            question__job_id=job_id
+        ).count()
+
+        if answered_questions < total_questions:
+            return Response(
+                {"error": "Please answer all screening questions before applying"},
+                status=400
+            )
+
+
+class AddQuestionView(generics.CreateAPIView):
+    queryset = ScreeningQuestion.objects.all()
+    serializer_class = ScreeningQuestionSerializer
+
+    def create(self, request, *args, **kwargs):
+        job_id = request.data.get("job")
+
+        question_count = ScreeningQuestion.objects.filter(job_id=job_id).count()
+
+        if question_count >= 10:
+            return Response(
+                {"error": "Maximum 10 questions allowed for this job"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        return super().create(request, *args, **kwargs)
+
+class AddQuestionView(generics.CreateAPIView):
+    queryset = ScreeningQuestion.objects.all()
+    serializer_class = ScreeningQuestionSerializer
+
+
+class SubmitAnswerView(generics.CreateAPIView):
+    queryset = CandidateAnswer.objects.all()
+    serializer_class = CandidateAnswerSerializer
 
 
 # ==============================
